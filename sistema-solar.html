@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚁 Sistema Solar - Vista Cenital</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #050510;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+        
+        /* Panel de información */
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 340px;
+            max-height: 85vh;
+            background: rgba(10, 15, 40, 0.95);
+            border: 2px solid #4a90e2;
+            border-radius: 16px;
+            padding: 0;
+            box-shadow: 0 0 40px rgba(74, 144, 226, 0.3);
+            backdrop-filter: blur(15px);
+            z-index: 100;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        #info-panel.hidden {
+            opacity: 0;
+            transform: translateX(400px);
+            pointer-events: none;
+        }
+        
+        .panel-header {
+            background: linear-gradient(135deg, #1a2a5a, #2a4a8a);
+            padding: 15px 20px;
+            border-bottom: 2px solid #4a90e2;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .panel-header h2 {
+            font-size: 1.3em;
+            color: #fff;
+            flex: 1;
+        }
+        
+        .panel-header .planet-icon {
+            font-size: 2em;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 0 5px;
+            transition: color 0.2s;
+        }
+        
+        .close-btn:hover { color: #fff; }
+        
+        .panel-body {
+            padding: 15px 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(74, 144, 226, 0.2);
+        }
+        
+        .info-row:last-child { border-bottom: none; }
+        
+        .info-label {
+            color: #8899bb;
+            font-size: 0.9em;
+        }
+        
+        .info-value {
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-align: right;
+            max-width: 65%;
+        }
+        
+        .composition {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px solid rgba(74, 144, 226, 0.3);
+        }
+        
+        .composition h4 {
+            color: #4a90e2;
+            margin-bottom: 12px;
+            font-size: 1em;
+        }
+        
+        .comp-item {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            font-size: 0.85em;
+        }
+        
+        .comp-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin-right: 10px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .comp-bar-bg {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin: 0 10px;
+            overflow: hidden;
+        }
+        
+        .comp-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .comp-percent {
+            color: #aaa;
+            min-width: 40px;
+            text-align: right;
+        }
+        
+        .internal-structure {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(74, 144, 226, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #4a90e2;
+        }
+        
+        .internal-structure h4 {
+            color: #4a90e2;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        
+        .internal-structure p {
+            font-size: 0.85em;
+            line-height: 1.5;
+            color: #bbb;
+        }
+        
+        /* Controles principales */
+        .main-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            background: rgba(10, 15, 40, 0.9);
+            padding: 10px 15px;
+            border-radius: 50px;
+            border: 1px solid rgba(74, 144, 226, 0.4);
+            z-index: 100;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .ctrl-btn {
+            background: linear-gradient(135deg, #1a2a5a, #2a4a8a);
+            color: #fff;
+            border: 1px solid rgba(74, 144, 226, 0.3);
+            padding: 8px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .ctrl-btn:hover {
+            background: linear-gradient(135deg, #2a4a8a, #3a5a9a);
+            box-shadow: 0 0 15px rgba(74, 144, 226, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .ctrl-btn.active {
+            background: linear-gradient(135deg, #4a90e2, #6ab0f3);
+            border-color: #6ab0f3;
+        }
+        
+        #speed-display {
+            color: #4a90e2;
+            font-weight: bold;
+            font-size: 0.9em;
+            padding: 0 5px;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        /* Panel de navegación */
+        .nav-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 15, 40, 0.9);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(74, 144, 226, 0.3);
+            z-index: 100;
+            max-width: 250px;
+        }
+        
+        .nav-panel h4 {
+            color: #4a90e2;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        
+        .planet-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .planet-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 0.85em;
+        }
+        
+        .planet-item:hover {
+            background: rgba(74, 144, 226, 0.2);
+        }
+        
+        .planet-item.active {
+            background: rgba(74, 144, 226, 0.3);
+            border: 1px solid rgba(74, 144, 226, 0.5);
+        }
+        
+        .planet-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+        
+        /* Instrucciones */
+        .instructions {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            background: rgba(10, 15, 40, 0.85);
+            padding: 12px 15px;
+            border-radius: 10px;
+            border-left: 3px solid #4a90e2;
+            font-size: 0.8em;
+            max-width: 280px;
+            z-index: 100;
+        }
+        
+        .instructions p {
+            margin: 3px 0;
+            color: #aaa;
+        }
+        
+        .instructions strong { color: #4a90e2; }
+        
+        /* Loading */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2em;
+            color: #4a90e2;
+            z-index: 200;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #4a90e2; border-radius: 3px; }
+        
+        /* Tooltip flotante */
+        .tooltip {
+            position: absolute;
+            background: rgba(10, 15, 40, 0.95);
+            border: 1px solid #4a90e2;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.85em;
+            pointer-events: none;
+            z-index: 150;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .tooltip.visible {
+            opacity: 1;
+        }
+        
+        /* Modo vista */
+        .view-mode-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 15, 40, 0.9);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(74, 144, 226, 0.4);
+            font-size: 0.85em;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <canvas id="solarCanvas"></canvas>
+        <div id="loading">🚁 Cargando sistema solar...</div>
+        
+        <!-- Panel de información -->
+        <div id="info-panel" class="hidden">
+            <div class="panel-header">
+                <span class="planet-icon" id="panel-icon">🪐</span>
+                <h2 id="panel-title">Planeta</h2>
+                <button class="close-btn" onclick="closePanel()">×</button>
+            </div>
+            <div class="panel-body" id="panel-body"></div>
+        </div>
+        
+        <!-- Lista de navegación rápida -->
+        <div class="nav-panel">
+            <h4>🧭 Navegación Rápida</h4>
+            <div class="planet-list" id="planet-list"></div>
+        </div>
+        
+        <!-- Indicador de vista -->
+        <div class="view-mode-indicator" id="view-indicator">
+            🚁 Vista Cenital - Helicóptero Interestelar
+        </div>
+        
+        <!-- Instrucciones -->
+        <div class="instructions">
+            <p><strong>🖱️ Click</strong> en cualquier planeta o luna</p>
+            <p><strong>🔄 Arrastrar</strong>: Mover vista</p>
+            <p><strong>🔍 Rueda</strong>: Zoom</p>
+            <p><strong>Espacio</strong>: Pausar/Reanudar</p>
+        </div>
+        
+        <!-- Controles principales -->
+        <div class="main-controls">
+            <button class="ctrl-btn" id="btn-play" onclick="togglePause()">⏸️ Pausar</button>
+            <button class="ctrl-btn" onclick="changeSpeed(-0.5)">🐌</button>
+            <span id="speed-display">1.0x</span>
+            <button class="ctrl-btn" onclick="changeSpeed(0.5)">🚀</button>
+            <button class="ctrl-btn" onclick="resetView()">🔄 Reset</button>
+            <button class="ctrl-btn" id="btn-orbits" onclick="toggleOrbits()">🔵 Órbitas</button>
+            <button class="ctrl-btn" id="btn-labels" onclick="toggleLabels()">🏷️ Etiquetas</button>
+            <button class="ctrl-btn" id="btn-asteroids" onclick="toggleAsteroids()">☄️ Asteroides</button>
+            <button class="ctrl-btn" id="btn-perspective" onclick="togglePerspective()">🌐 3D</button>
+        </div>
+        
+        <!-- Tooltip -->
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <script>
+    // ==================== DATOS COMPLETOS ====================
+    const DATA = {
+        sun: {
+            name: "Sol",
+            emoji: "☀️",
+            type: "Estrella",
+            radius: 35,
+            color: "#FDB813",
+            glowColor: "#FFA500",
+            info: {
+                "Tipo": "Estrella enana amarilla (G2V)",
+                "Edad": "4.600 millones de años",
+                "Diámetro": "1.392.700 km",
+                "Masa": "1.989 × 10³⁰ kg (99.86% del sistema)",
+                "Temperatura superficial": "5.500 °C",
+                "Temperatura núcleo": "15.000.000 °C",
+                "Gravedad superficial": "274 m/s² (28g)",
+                "Período de rotación": "25-35 días (diferencial)",
+                "Luminosidad": "3.828 × 10²⁶ W",
+                "Vida restante": "~5.000 millones de años"
+            },
+            composition: [
+                { name: "Hidrógeno", percent: 74, color: "#FF6B6B" },
+                { name: "Helio", percent: 24, color: "#4ECDC4" },
+                { name: "Otros (O, C, Ne, Fe)", percent: 2, color: "#95E1D3" }
+            ]
+        },
+        planets: [
+            {
+                name: "Mercurio",
+                emoji: "☿️",
+                radius: 6,
+                color: "#B5B5B5",
+                orbitRadius: 80,
+                speed: 4.15, // Velocidad relativa (más rápido = más cerca)
+                info: {
+                    "Tipo": "Planeta rocoso terrestre",
+                    "Diámetro": "4.879 km",
+                    "Masa": "3.301 × 10²³ kg",
+                    "Distancia al Sol": "57.9 millones km (0.39 UA)",
+                    "Período orbital": "88 días",
+                    "Período de rotación": "58.6 días",
+                    "Temperatura": "-173°C a 427°C",
+                    "Gravedad": "3.7 m/s² (0.38g)",
+                    "Atmósfera": "Exosfera: O, Na, H, He, K",
+                    "Lunas": "0",
+                    "Inclinación axial": "0.034°",
+                    "Día más largo": "176 días terrestres"
+                },
+                composition: [
+                    { name: "Hierro (núcleo)", percent: 70, color: "#7F7F7F" },
+                    { name: "Silicatos", percent: 30, color: "#A0A0A0" }
+                ],
+                structure: "Núcleo de hierro enorme (75% del radio). Manto delgado de silicatos. Corteza craterizada similar a la Luna."
+            },
+            {
+                name: "Venus",
+                emoji: "♀️",
+                radius: 10,
+                color: "#E6C87A",
+                orbitRadius: 120,
+                speed: 1.62,
+                retrograde: true,
+                info: {
+                    "Tipo": "Planeta rocoso terrestre",
+                    "Diámetro": "12.104 km",
+                    "Masa": "4.867 × 10²⁴ kg",
+                    "Distancia al Sol": "108.2 millones km (0.72 UA)",
+                    "Período orbital": "225 días",
+                    "Período de rotación": "243 días (retrógrado)",
+                    "Temperatura superficial": "464°C (efecto invernadero extremo)",
+                    "Gravedad": "8.87 m/s² (0.9g)",
+                    "Atmósfera": "96.5% CO₂, 3.5% N₂, presión 92 atm",
+                    "Lunas": "0",
+                    "Inclinación axial": "177.4° (rotación inversa)",
+                    "Dato curioso": "Un día venusino es más largo que su año"
+                },
+                composition: [
+                    { name: "CO₂", percent: 96.5, color: "#FF9E6D" },
+                    { name: "N₂", percent: 3.5, color: "#6DB3F2" }
+                ],
+                structure: "Núcleo de hierro-níquel (~30% del radio). Manto de silicatos. Corteza volcánica joven con miles de volcanes."
+            },
+            {
+                name: "Tierra",
+                emoji: "🌍",
+                radius: 11,
+                color: "#4A90D9",
+                orbitRadius: 170,
+                speed: 1.0,
+                info: {
+                    "Tipo": "Planeta rocoso terrestre",
+                    "Diámetro": "12.742 km",
+                    "Masa": "5.972 × 10²⁴ kg",
+                    "Distancia al Sol": "149.6 millones km (1.00 UA)",
+                    "Período orbital": "365.25 días",
+                    "Período de rotación": "23h 56m 4s",
+                    "Temperatura media": "15°C (rango: -89°C a 57°C)",
+                    "Gravedad": "9.807 m/s² (1g)",
+                    "Atmósfera": "78% N₂, 21% O₂, 0.04% CO₂",
+                    "Lunas": "1 (Luna)",
+                    "Agua superficial": "71% de la superficie",
+                    "Campo magnético": "Sí - protege de viento solar"
+                },
+                composition: [
+                    { name: "Nitrógeno", percent: 78, color: "#6DB3F2" },
+                    { name: "Oxígeno", percent: 21, color: "#FF6B6B" },
+                    { name: "Argón, CO₂, otros", percent: 1, color: "#95E1D3" }
+                ],
+                structure: "Núcleo interno sólido (Fe-Ni, 1220km). Núcleo externo líquido (2260km). Manto viscoso (2900km). Corteza tectónica (5-70km)."
+            },
+            {
+                name: "Marte",
+                emoji: "♂️",
+                radius: 8,
+                color: "#C1440E",
+                orbitRadius: 230,
+                speed: 0.53,
+                info: {
+                    "Tipo": "Planeta rocoso terrestre",
+                    "Diámetro": "6.779 km",
+                    "Masa": "6.417 × 10²³ kg",
+                    "Distancia al Sol": "227.9 millones km (1.52 UA)",
+                    "Período orbital": "687 días (1.88 años)",
+                    "Período de rotación": "24h 37m",
+                    "Temperatura media": "-63°C (rango: -140°C a 20°C)",
+                    "Gravedad": "3.71 m/s² (0.38g)",
+                    "Atmósfera": "95% CO₂, 2.6% N₂, 1.9% Ar",
+                    "Lunas": "2 (Fobos, Deimos)",
+                    "Monte Olimpo": "21.9 km (volcán más alto del sistema solar)",
+                    "Valles Marineris": "4.000 km de largo, hasta 7 km de profundidad"
+                },
+                composition: [
+                    { name: "CO₂", percent: 95, color: "#FF9E6D" },
+                    { name: "N₂", percent: 2.6, color: "#6DB3F2" },
+                    { name: "Ar", percent: 1.9, color: "#95E1D3" }
+                ],
+                structure: "Núcleo de Fe-S parcialmente fundido. Manto de silicato. Corteza basáltica con óxidos de hierro (color rojo)."
+            },
+            {
+                name: "Júpiter",
+                emoji: "♃",
+                radius: 28,
+                color: "#D4A574",
+                orbitRadius: 380,
+                speed: 0.084,
+                info: {
+                    "Tipo": "Gigante gaseoso",
+                    "Diámetro": "139.820 km (11x Tierra)",
+                    "Masa": "1.898 × 10²⁷ kg (318 Tierras)",
+                    "Distancia al Sol": "778.5 millones km (5.20 UA)",
+                    "Período orbital": "11.86 años",
+                    "Período de rotación": "9h 56m (el más rápido)",
+                    "Temperatura en nubes": "-145°C",
+                    "Gravedad": "24.79 m/s² (2.5g)",
+                    "Atmósfera": "90% H₂, 10% He, trazas CH₄, NH₃",
+                    "Lunas": "95 confirmadas",
+                    "Gran Mancha Roja": "Anticiclón de 16.000 km de ancho",
+                    "Anillos": "Sí, tenues (descubiertos 1979)"
+                },
+                composition: [
+                    { name: "Hidrógeno", percent: 90, color: "#FF6B6B" },
+                    { name: "Helio", percent: 10, color: "#4ECDC4" }
+                ],
+                structure: "Posible núcleo rocoso (10-15 Tierras). Capa de hidrógeno metálico líquido. Atmósfera con bandas de nubes de amoníaco."
+            },
+            {
+                name: "Saturno",
+                emoji: "♄",
+                radius: 24,
+                color: "#E8D5A3",
+                orbitRadius: 520,
+                speed: 0.034,
+                hasRings: true,
+                info: {
+                    "Tipo": "Gigante gaseoso",
+                    "Diámetro": "116.460 km (9.5x Tierra)",
+                    "Masa": "5.683 × 10²⁶ kg (95 Tierras)",
+                    "Distancia al Sol": "1.434 millones km (9.54 UA)",
+                    "Período orbital": "29.45 años",
+                    "Período de rotación": "10h 33m",
+                    "Temperatura en nubes": "-178°C",
+                    "Gravedad": "10.44 m/s² (1.06g)",
+                    "Atmósfera": "96% H₂, 3% He, trazas CH₄",
+                    "Lunas": "146 confirmadas",
+                    "Densidad": "0.687 g/cm³ (flotaría en agua)",
+                    "Anillos": "7 principales, 99.9% hielo de agua"
+                },
+                composition: [
+                    { name: "Hidrógeno", percent: 96, color: "#FF6B6B" },
+                    { name: "Helio", percent: 3, color: "#4ECDC4" },
+                    { name: "Metano, otros", percent: 1, color: "#95E1D3" }
+                ],
+                structure: "Núcleo rocoso/hielo (~10-20 Tierras). Capa de hidrógeno metálico. Atmósfera con tormentas hexagonales en los polos."
+            },
+            {
+                name: "Urano",
+                emoji: "♅",
+                radius: 16,
+                color: "#7EC8E3",
+                orbitRadius: 650,
+                speed: 0.012,
+                retrograde: true,
+                info: {
+                    "Tipo": "Gigante de hielo",
+                    "Diámetro": "50.724 km (4x Tierra)",
+                    "Masa": "8.681 × 10²⁵ kg (14.5 Tierras)",
+                    "Distancia al Sol": "2.871 millones km (19.19 UA)",
+                    "Período orbital": "84 años",
+                    "Período de rotación": "17h 14m (eje inclinado 98°)",
+                    "Temperatura mínima": "-224°C (el más frío)",
+                    "Gravedad": "8.69 m/s² (0.89g)",
+                    "Atmósfera": "83% H₂, 15% He, 2.3% CH₄",
+                    "Lunas": "28 confirmadas",
+                    "Inclinación axial": "97.77° (gira de lado)",
+                    "Anillos": "13 conocidos, oscuros y tenues"
+                },
+                composition: [
+                    { name: "Hidrógeno", percent: 83, color: "#FF6B6B" },
+                    { name: "Helio", percent: 15, color: "#4ECDC4" },
+                    { name: "Metano", percent: 2.3, color: "#6DB3F2" }
+                ],
+                structure: "Núcleo rocoso pequeño. Manto de 'hielos' calientes (agua, amoníaco, metano a alta presión). Atmósfera con metano que absorbe rojo."
+            },
+            {
+                name: "Neptuno",
+                emoji: "♆",
+                radius: 15,
+                color: "#4169E1",
+                orbitRadius: 780,
+                speed: 0.006,
+                info: {
+                    "Tipo": "Gigante de hielo",
+                    "Diámetro": "49.244 km (3.9x Tierra)",
+                    "Masa": "1.024 × 10²⁶ kg (17 Tierras)",
+                    "Distancia al Sol": "4.498 millones km (30.07 UA)",
+                    "Período orbital": "165 años",
+                    "Período de rotación": "16h 6m",
+                    "Temperatura en nubes": "-214°C",
+                    "Gravedad": "11.15 m/s² (1.14g)",
+                    "Atmósfera": "80% H₂, 19% He, 1.5% CH₄",
+                    "Lunas": "16 confirmadas",
+                    "Vientos": "Hasta 2.100 km/h (los más rápidos)",
+                    "Gran Mancha Oscura": "Anticiclón similar al de Júpiter"
+                },
+                composition: [
+                    { name: "Hidrógeno", percent: 80, color: "#FF6B6B" },
+                    { name: "Helio", percent: 19, color: "#4ECDC4" },
+                    { name: "Metano", percent: 1.5, color: "#6DB3F2" }
+                ],
+                structure: "Similar a Urano. Núcleo rocoso. Manto de hielos calientes. Atmósfera con metano. Posible océano de diamantes en el interior."
+            }
+        ],
+        moons: [
+            {
+                name: "Luna",
+                parent: "Tierra",
+                emoji: "🌙",
+                radius: 3,
+                color: "#C0C0C0",
+                orbitRadius: 20,
+                speed: 13.0,
+                info: {
+                    "Tipo": "Satélite natural",
+                    "Diámetro": "3.474 km",
+                    "Distancia a la Tierra": "384.400 km",
+                    "Período orbital": "27.3 días",
+                    "Rotación": "Sincrónica (misma cara visible)",
+                    "Temperatura": "-173°C a 127°C",
+                    "Gravedad": "1.62 m/s² (0.16g)",
+                    "Atmósfera": "Prácticamente inexistente",
+                    "Misiones tripuladas": "6 (Apollo 11-17, 1969-1972)",
+                    "Origen": "Impacto gigante con Theia (~4.5 Ga)"
+                },
+                composition: [
+                    { name: "Oxígeno (en rocas)", percent: 43, color: "#FF6B6B" },
+                    { name: "Silicio", percent: 21, color: "#A0A0A0" },
+                    { name: "Mg, Fe, Ca, Al", percent: 36, color: "#7F7F7F" }
+                ]
+            },
+            {
+                name: "Fobos",
+                parent: "Marte",
+                emoji: "🥔",
+                radius: 1.5,
+                color: "#8B7355",
+                orbitRadius: 14,
+                speed: 20.0,
+                info: {
+                    "Tipo": "Satélite irregular",
+                    "Dimensiones": "27 × 22 × 18 km",
+                    "Distancia a Marte": "9.377 km",
+                    "Período orbital": "7h 39m",
+                    "Destino": "Chocará con Marte en ~50 millones de años",
+                    "Forma": "Irregular, similar a una papa"
+                }
+            },
+            {
+                name: "Deimos",
+                parent: "Marte",
+                emoji: "🪨",
+                radius: 1,
+                color: "#9B8B7B",
+                orbitRadius: 22,
+                speed: 8.0,
+                info: {
+                    "Tipo": "Satélite irregular",
+                    "Dimensiones": "15 × 12 × 11 km",
+                    "Distancia a Marte": "23.460 km",
+                    "Período orbital": "30.3 horas",
+                    "Forma": "Irregular, muy craterizado"
+                }
+            },
+            {
+                name: "Ío",
+                parent: "Júpiter",
+                emoji: "🌋",
+                radius: 3.5,
+                color: "#FFD700",
+                orbitRadius: 38,
+                speed: 8.0,
+                info: {
+                    "Tipo": "Luna galileana",
+                    "Diámetro": "3.643 km",
+                    "Característica": "Objeto más volcánicamente activo del sistema solar",
+                    "Volcanes activos": "400+",
+                    "Superficie": "Azufre y dióxido de azufre congelado",
+                    "Calentamiento": "Mareas gravitacionales de Júpiter",
+                    "Período orbital": "1.77 días"
+                },
+                composition: [
+                    { name: "Azufre", percent: 60, color: "#FFD700" },
+                    { name: "Silicatos", percent: 30, color: "#A0A0A0" },
+                    { name: "SO₂", percent: 10, color: "#FF9E6D" }
+                ]
+            },
+            {
+                name: "Europa",
+                parent: "Júpiter",
+                emoji: "🧊",
+                radius: 3,
+                color: "#E8D5C4",
+                orbitRadius: 50,
+                speed: 4.0,
+                info: {
+                    "Tipo": "Luna galileana",
+                    "Diámetro": "3.121 km",
+                    "Océano subsuperficial": "100 km de profundidad, 2x volumen terrestre",
+                    "Superficie": "Hielo joven con grietas rojizas",
+                    "Potencial biológico": "Alto - agua líquida + energía térmica",
+                    "Período orbital": "3.55 días",
+                    "Misión futura": "Europa Clipper (NASA, 2024)"
+                },
+                composition: [
+                    { name: "Hielo de agua", percent: 70, color: "#B0E0E6" },
+                    { name: "Silicatos", percent: 25, color: "#A0A0A0" },
+                    { name: "Metales", percent: 5, color: "#7F7F7F" }
+                ]
+            },
+            {
+                name: "Ganímedes",
+                parent: "Júpiter",
+                emoji: "🌑",
+                radius: 4,
+                color: "#C0B8A8",
+                orbitRadius: 65,
+                speed: 2.0,
+                info: {
+                    "Tipo": "Luna galileana",
+                    "Diámetro": "5.268 km (la más grande del sistema solar)",
+                    "Mayor que": "Mercurio y Plutón",
+                    "Campo magnético": "Única luna con magnetosfera propia",
+                    "Océano subsuperficial": "Posible capa entre capas de hielo",
+                    "Período orbital": "7.15 días"
+                },
+                composition: [
+                    { name: "Hielo de agua", percent: 50, color: "#B0E0E6" },
+                    { name: "Silicatos", percent: 45, color: "#A0A0A0" },
+                    { name: "Metales", percent: 5, color: "#7F7F7F" }
+                ]
+            },
+            {
+                name: "Calisto",
+                parent: "Júpiter",
+                emoji: "🌑",
+                radius: 3.5,
+                color: "#8B7D6B",
+                orbitRadius: 82,
+                speed: 0.8,
+                info: {
+                    "Tipo": "Luna galileana",
+                    "Diámetro": "4.821 km",
+                    "Superficie": "Más craterizada del sistema solar (antigua)",
+                    "Océano subsuperficial": "Posible capa de agua salada",
+                    "Período orbital": "16.69 días",
+                    "Radiación": "Menor exposición que otras lunas galileanas"
+                }
+            },
+            {
+                name: "Titán",
+                parent: "Saturno",
+                emoji: "🪐",
+                radius: 4.5,
+                color: "#D4A76A",
+                orbitRadius: 48,
+                speed: 2.0,
+                info: {
+                    "Tipo": "Satélite más grande de Saturno",
+                    "Diámetro": "5.150 km (más grande que Mercurio)",
+                    "Atmósfera": "95% N₂, 5% CH₄ (más densa que la Tierra)",
+                    "Superficie": "Lagos y ríos de metano/etano líquido",
+                    "Presión superficial": "1.45 atm (mayor que la Tierra)",
+                    "Período orbital": "15.95 días",
+                    "Misión": "Huygens (2005) aterrizó en su superficie"
+                },
+                composition: [
+                    { name: "Hielo de agua", percent: 50, color: "#B0E0E6" },
+                    { name: "Roca", percent: 45, color: "#8B7D6B" },
+                    { name: "Hidrocarburos", percent: 5, color: "#D4A76A" }
+                ]
+            },
+            {
+                name: "Encélado",
+                parent: "Saturno",
+                emoji: "❄️",
+                radius: 2,
+                color: "#F5F5F5",
+                orbitRadius: 30,
+                speed: 5.0,
+                info: {
+                    "Tipo": "Satélite de Saturno",
+                    "Diámetro": "504 km",
+                    "Geiseres": "Columnas de agua por el polo sur (Cassini, 2005)",
+                    "Océano global": "Confirmado bajo la corteza de hielo",
+                    "Albedo": "0.99 (una de las superficies más brillantes)",
+                    "Período orbital": "1.37 días",
+                    "Potencial biológico": "Alto - agua + energía + química orgánica"
+                }
+            },
+            {
+                name: "Tritón",
+                parent: "Neptuno",
+                emoji: "🧊",
+                radius: 3,
+                color: "#B8D4E3",
+                orbitRadius: 35,
+                speed: -3.0, // Retrograde
+                info: {
+                    "Tipo": "Satélite de Neptuno",
+                    "Diámetro": "2.707 km",
+                    "Órbita": "Retrógrada (capturado del Cinturón de Kuiper)",
+                    "Superficie": "Nitrógeno congelado, géiseres de N₂",
+                    "Temperatura": "-235°C (superficie más fría)",
+                    "Período orbital": "5.88 días (retrógrado)",
+                    "Destino": "Destrucción en ~3.6 mil millones de años"
+                },
+                composition: [
+                    { name: "N₂ congelado", percent: 55, color: "#B8D4E3" },
+                    { name: "Hielo de agua", percent: 25, color: "#B0E0E6" },
+                    { name: "Roca", percent: 20, color: "#8B7D6B" }
+                ]
+            }
+        ],
+        dwarfPlanets: [
+            {
+                name: "Plutón",
+                emoji: "🔵",
+                radius: 5,
+                color: "#D4B896",
+                orbitRadius: 900,
+                speed: 0.004,
+                inclination: 17,
+                info: {
+                    "Tipo": "Planeta enano",
+                    "Diámetro": "2.377 km",
+                    "Distancia al Sol": "5.906 millones km (39.48 UA)",
+                    "Período orbital": "248 años",
+                    "Rotación": "6.39 días (retrógrado)",
+                    "Temperatura": "-229°C",
+                    "Lunas": "5 (Caronte, Nix, Hydra, Cerbero, Estigia)",
+                    "Inclinación orbital": "17.16°",
+                    "Misión": "New Horizons (sobrevuelo 2015)",
+                    "Corazón": "Planicie Sputnik Planitia (N₂ congelado)"
+                },
+                composition: [
+                    { name: "N₂ congelado", percent: 98, color: "#B8D4E3" },
+                    { name: "CH₄", percent: 1, color: "#95E1D3" },
+                    { name: "CO", percent: 1, color: "#FF6B6B" }
+                ]
+            }
+        ]
+    };
+
+    // ==================== ESTADO DE LA APLICACIÓN ====================
+    const canvas = document.getElementById('solarCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let W, H;
+    let time = 0;
+    let isPaused = false;
+    let speed = 1.0;
+    let showOrbits = true;
+    let showLabels = true;
+    let showAsteroids = true;
+    let use3D = false;
+    
+    // Cámara
+    let camX = 0, camY = 0;
+    let zoom = 1;
+    let isDragging = false;
+    let dragStartX, dragStartY;
+    let dragCamStartX, dragCamStartY;
+    
+    // Selección
+    let hoveredBody = null;
+    let selectedBody = null;
+    
+    // Asteroides (generados una vez)
+    let asteroids = [];
+    
+    // ==================== INICIALIZACIÓN ====================
+    function init() {
+        resize();
+        generateAsteroids();
+        buildPlanetList();
+        setupEvents();
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('btn-orbits').classList.add('active');
+        document.getElementById('btn-labels').classList.add('active');
+        document.getElementById('btn-asteroids').classList.add('active');
+        
+        animate();
+    }
+    
+    function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+    
+    function generateAsteroids() {
+        asteroids = [];
+        for (let i = 0; i < 200; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 270 + Math.random() * 60; // Entre Marte y Júpiter
+            asteroids.push({
+                angle: angle,
+                radius: radius,
+                size: 0.5 + Math.random() * 2,
+                speed: 0.3 + Math.random() * 0.2,
+                brightness: 0.3 + Math.random() * 0.5
+            });
+        }
+    }
+    
+    function buildPlanetList() {
+        const list = document.getElementById('planet-list');
+        list.innerHTML = '';
+        
+        // Sol
+        addItem(list, DATA.sun, 'sun');
+        
+        // Planetas
+        DATA.planets.forEach(p => addItem(list, p, 'planet'));
+        
+        // Planetas enanos
+        DATA.dwarfPlanets.forEach(p => addItem(list, p, 'dwarf'));
+        
+        // Lunas principales
+        DATA.moons.slice(0, 5).forEach(m => addItem(list, m, 'moon'));
+    }
+    
+    function addItem(container, body, type) {
+        const div = document.createElement('div');
+        div.className = 'planet-item';
+        div.dataset.name = body.name;
+        div.innerHTML = `<div class="planet-dot" style="background:${body.color}"></div><span>${body.emoji} ${body.name}</span>`;
+        div.onclick = () => selectBody(body, type);
+        container.appendChild(div);
+    }
+    
+    function setupEvents() {
+        window.addEventListener('resize', resize);
+        
+        canvas.addEventListener('mousedown', onMouseDown);
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('mouseup', onMouseUp);
+        canvas.addEventListener('mouseleave', onMouseUp);
+        canvas.addEventListener('wheel', onWheel, { passive: false });
+        canvas.addEventListener('click', onClick);
+        
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+        });
+    }
+    
+    // ==================== INTERACCIÓN ====================
+    function onMouseDown(e) {
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragCamStartX = camX;
+        dragCamStartY = camY;
+    }
+    
+    function onMouseMove(e) {
+        if (isDragging) {
+            camX = dragCamStartX + (e.clientX - dragStartX) / zoom;
+            camY = dragCamStartY + (e.clientY - dragStartY) / zoom;
+        }
+        
+        // Detectar hover
+        hoveredBody = detectHover(e.clientX, e.clientY);
+        canvas.style.cursor = hoveredBody ? 'pointer' : (isDragging ? 'grabbing' : 'grab');
+        
+        // Tooltip
+        showTooltip(e.clientX, e.clientY);
+    }
+    
+    function onMouseUp() {
+        isDragging = false;
+    }
+    
+    function onWheel(e) {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        zoom = Math.max(0.2, Math.min(5, zoom * factor));
+    }
+    
+    function onClick(e) {
+        if (!isDragging && hoveredBody) {
+            selectBody(hoveredBody.body, hoveredBody.type);
+        }
+    }
+    
+    function detectHover(mx, my) {
+        const cx = W / 2 + camX * zoom;
+        const cy = H / 2 + camY * zoom;
+        
+        // Verificar Sol
+        const sunDist = Math.hypot(mx - cx, my - cy);
+        if (sunDist < DATA.sun.radius * zoom + 10) {
+            return { body: DATA.sun, type: 'sun' };
+        }
+        
+        // Verificar planetas
+        for (const planet of DATA.planets) {
+            const angle = time * planet.speed * 0.001;
+            const px = cx + Math.cos(angle) * planet.orbitRadius * zoom;
+            const py = cy + Math.sin(angle) * planet.orbitRadius * zoom;
+            const dist = Math.hypot(mx - px, my - py);
+            if (dist < planet.radius * zoom + 8) {
+                return { body: planet, type: 'planet' };
+            }
+        }
+        
+        // Verificar planetas enanos
+        for (const dp of DATA.dwarfPlanets) {
+            const angle = time * dp.speed * 0.001;
+            const px = cx + Math.cos(angle) * dp.orbitRadius * zoom;
+            const py = cy + Math.sin(angle) * dp.orbitRadius * zoom;
+            const dist = Math.hypot(mx - px, my - py);
+            if (dist < dp.radius * zoom + 8) {
+                return { body: dp, type: 'dwarf' };
+            }
+        }
+        
+        // Verificar lunas
+        for (const moon of DATA.moons) {
+            const parent = DATA.planets.find(p => p.name === moon.parent);
+            if (!parent) continue;
+            
+            const parentAngle = time * parent.speed * 0.001;
+            const parentX = cx + Math.cos(parentAngle) * parent.orbitRadius * zoom;
+            const parentY = cy + Math.sin(parentAngle) * parent.orbitRadius * zoom;
+            
+            const moonAngle = time * moon.speed * 0.001;
+            const mx2 = parentX + Math.cos(moonAngle) * moon.orbitRadius * zoom;
+            const my2 = parentY + Math.sin(moonAngle) * moon.orbitRadius * zoom;
+            
+            const dist = Math.hypot(mx - mx2, my - my2);
+            if (dist < moon.radius * zoom + 6) {
+                return { body: moon, type: 'moon' };
+            }
+        }
+        
+        return null;
+    }
+    
+    function showTooltip(mx, my) {
+        const tooltip = document.getElementById('tooltip');
+        if (hoveredBody && !selectedBody) {
+            tooltip.textContent = `${hoveredBody.body.emoji} ${hoveredBody.body.name} - Click para ver detalles`;
+            tooltip.style.left = (mx + 15) + 'px';
+            tooltip.style.top = (my - 10) + 'px';
+            tooltip.classList.add('visible');
+        } else {
+            tooltip.classList.remove('visible');
+        }
+    }
+    
+    function selectBody(body, type) {
+        selectedBody = { body, type };
+        showInfoPanel(body, type);
+        
+        // Actualizar lista
+        document.querySelectorAll('.planet-item').forEach(el => {
+            el.classList.toggle('active', el.dataset.name === body.name);
+        });
+    }
+    
+    function closePanel() {
+        selectedBody = null;
+        document.getElementById('info-panel').classList.add('hidden');
+        document.querySelectorAll('.planet-item').forEach(el => el.classList.remove('active'));
+    }
+    
+    function showInfoPanel(body, type) {
+        const panel = document.getElementById('info-panel');
+        document.getElementById('panel-icon').textContent = body.emoji || '🪐';
+        document.getElementById('panel-title').textContent = body.name;
+        
+        let html = '';
+        
+        // Información
+        for (const [key, value] of Object.entries(body.info)) {
+            html += `<div class="info-row"><span class="info-label">${key}</span><span class="info-value">${value}</span></div>`;
+        }
+        
+        // Composición
+        if (body.composition) {
+            html += '<div class="composition"><h4>🧪 Composición</h4>';
+            for (const comp of body.composition) {
+                html += `
+                    <div class="comp-item">
+                        <div class="comp-color" style="background:${comp.color}"></div>
+                        <span style="min-width:120px">${comp.name}</span>
+                        <div class="comp-bar-bg"><div class="comp-bar" style="width:${comp.percent}%;background:${comp.color}"></div></div>
+                        <span class="comp-percent">${comp.percent}%</span>
+                    </div>`;
+            }
+            html += '</div>';
+        }
+        
+        // Estructura interna
+        if (body.structure) {
+            html += `<div class="internal-structure"><h4>🌋 Estructura interna</h4><p>${body.structure}</p></div>`;
+        }
+        
+        // Tipo
+        if (type === 'moon') {
+            html += `<div class="info-row"><span class="info-label">Planeta padre</span><span class="info-value">${body.parent}</span></div>`;
+        }
+        if (type === 'dwarf') {
+            html += `<div class="info-row"><span class="info-label">Clasificación</span><span class="info-value">Planeta enano (UAI 2006)</span></div>`;
+        }
+        
+        document.getElementById('panel-body').innerHTML = html;
+        panel.classList.remove('hidden');
+    }
+    
+    // ==================== CONTROLES ====================
+    function togglePause() {
+        isPaused = !isPaused;
+        document.getElementById('btn-play').textContent = isPaused ? '▶️ Reanudar' : '⏸️ Pausar';
+        document.getElementById('btn-play').classList.toggle('active', isPaused);
+    }
+    
+    function changeSpeed(delta) {
+        speed = Math.max(0.1, Math.min(5, speed + delta));
+        document.getElementById('speed-display').textContent = speed.toFixed(1) + 'x';
+    }
+    
+    function resetView() {
+        camX = 0; camY = 0; zoom = 1;
+        closePanel();
+    }
+    
+    function toggleOrbits() {
+        showOrbits = !showOrbits;
+        document.getElementById('btn-orbits').classList.toggle('active', showOrbits);
+    }
+    
+    function toggleLabels() {
+        showLabels = !showLabels;
+        document.getElementById('btn-labels').classList.toggle('active', showLabels);
+    }
+    
+    function toggleAsteroids() {
+        showAsteroids = !showAsteroids;
+        document.getElementById('btn-asteroids').classList.toggle('active', showAsteroids);
+    }
+    
+    function togglePerspective() {
+        use3D = !use3D;
+        document.getElementById('btn-perspective').classList.toggle('active', use3D);
+        document.getElementById('view-indicator').textContent = use3D ? '🌐 Vista 3D Perspectiva' : '🚁 Vista Cenital - Helicóptero Interestelar';
+    }
+    
+    // ==================== RENDERIZADO ====================
+    function drawStars() {
+        // Fondo estrellado estático
+        const seed = 12345;
+        let rng = seed;
+        function rand() { rng = (rng * 16807) % 2147483647; return (rng - 1) / 2147483646; }
+        
+        for (let i = 0; i < 300; i++) {
+            const x = rand() * W;
+            const y = rand() * H;
+            const size = rand() * 1.5 + 0.5;
+            const alpha = rand() * 0.5 + 0.3;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+            ctx.fill();
+        }
+    }
+    
+    function drawOrbit(cx, cy, radius, color = 'rgba(74,144,226,0.2)') {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * zoom, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+    
+    function drawSun(cx, cy) {
+        const sun = DATA.sun;
+        const r = sun.radius * zoom;
+        
+        // Brillo exterior
+        const glow = ctx.createRadialGradient(cx, cy, r, cx, cy, r * 4);
+        glow.addColorStop(0, 'rgba(253, 184, 19, 0.3)');
+        glow.addColorStop(0.5, 'rgba(255, 165, 0, 0.1)');
+        glow.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 4, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+        
+        // Sol
+        const grad = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, 0, cx, cy, r);
+        grad.addColorStop(0, '#FFF5E1');
+        grad.addColorStop(0.5, sun.color);
+        grad.addColorStop(1, sun.glowColor);
+        
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        
+        // Etiqueta
+        if (showLabels) {
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${Math.max(10, 12 * zoom)}px Segoe UI`;
+            ctx.textAlign = 'center';
+            ctx.fillText('☀️ Sol', cx, cy - r - 8);
+        }
+    }
+    
+    function drawPlanet(planet, cx, cy) {
+        const angle = time * planet.speed * 0.001;
+        const x = cx + Math.cos(angle) * planet.orbitRadius * zoom;
+        const y = cy + Math.sin(angle) * planet.orbitRadius * zoom;
+        const r = planet.radius * zoom;
+        
+        // Órbita
+        if (showOrbits) {
+            drawOrbit(cx, cy, planet.orbitRadius);
+        }
+        
+        // Selección/hover
+        const isSelected = selectedBody?.body.name === planet.name;
+        const isHovered = hoveredBody?.body.name === planet.name;
+        
+        if (isSelected || isHovered) {
+            ctx.beginPath();
+            ctx.arc(x, y, r + 10, 0, Math.PI * 2);
+            ctx.strokeStyle = isSelected ? '#4a90e2' : '#6ab0f3';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Planeta
+        const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+        grad.addColorStop(0, lighten(planet.color, 40));
+        grad.addColorStop(0.7, planet.color);
+        grad.addColorStop(1, darken(planet.color, 40));
+        
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Anillos de Saturno
+        if (planet.hasRings) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(1, 0.3);
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 2.2, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(200, 180, 150, 0.6)';
+            ctx.lineWidth = 3 * zoom;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(220, 200, 170, 0.4)';
+            ctx.lineWidth = 2 * zoom;
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        // Etiqueta
+        if (showLabels || isSelected || isHovered) {
+            ctx.fillStyle = '#fff';
+            ctx.font = `${Math.max(9, 11 * zoom)}px Segoe UI`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${planet.emoji} ${planet.name}`, x, y - r - 6);
+        }
+        
+        return { x, y };
+    }
+    
+    function drawDwarfPlanet(dp, cx, cy) {
+        const angle = time * dp.speed * 0.001;
+        const inclRad = (dp.inclination || 0) * Math.PI / 180;
+        const x = cx + Math.cos(angle) * dp.orbitRadius * zoom;
+        const y = cy + Math.sin(angle) * dp.orbitRadius * zoom * Math.cos(inclRad);
+        const r = dp.radius * zoom;
+        
+        if (showOrbits) {
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, dp.orbitRadius * zoom, dp.orbitRadius * zoom * Math.cos(inclRad), 0, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(74,144,226,0.15)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        
+        const isSelected = selectedBody?.body.name === dp.name;
+        const isHovered = hoveredBody?.body.name === dp.name;
+        
+        if (isSelected || isHovered) {
+            ctx.beginPath();
+            ctx.arc(x, y, r + 8, 0, Math.PI * 2);
+            ctx.strokeStyle = '#4a90e2';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+        grad.addColorStop(0, lighten(dp.color, 30));
+        grad.addColorStop(1, dp.color);
+        
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        
+        if (showLabels || isSelected || isHovered) {
+            ctx.fillStyle = '#fff';
+            ctx.font = `${Math.max(9, 10 * zoom)}px Segoe UI`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${dp.emoji} ${dp.name}`, x, y - r - 6);
+        }
+    }
+    
+    function drawMoon(moon, parentX, parentY) {
+        const angle = time * moon.speed * 0.001;
+        const x = parentX + Math.cos(angle) * moon.orbitRadius * zoom;
+        const y = parentY + Math.sin(angle) * moon.orbitRadius * zoom;
+        const r = Math.max(2, moon.radius * zoom);
+        
+        // Órbita lunar
+        if (showOrbits && zoom > 0.5) {
+            ctx.beginPath();
+            ctx.arc(parentX, parentY, moon.orbitRadius * zoom, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(100,150,255,0.1)';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+        }
+        
+        const isSelected = selectedBody?.body.name === moon.name;
+        const isHovered = hoveredBody?.body.name === moon.name;
+        
+        if (isSelected || isHovered) {
+            ctx.beginPath();
+            ctx.arc(x, y, r + 6, 0, Math.PI * 2);
+            ctx.strokeStyle = '#4a90e2';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = moon.color;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        
+        if (showLabels && zoom > 0.8 || isSelected || isHovered) {
+            ctx.fillStyle = '#ccc';
+            ctx.font = `${Math.max(8, 9 * zoom)}px Segoe UI`;
+            ctx.textAlign = 'center';
+            ctx.fillText(moon.name, x, y - r - 4);
+        }
+    }
+    
+    function drawAsteroidBelt(cx, cy) {
+        for (const ast of asteroids) {
+            const angle = ast.angle + time * ast.speed * 0.0001;
+            const x = cx + Math.cos(angle) * ast.radius * zoom;
+            const y = cy + Math.sin(angle) * ast.radius * zoom;
+            const size = ast.size * zoom;
+            
+            if (size > 0.3) {
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(150, 140, 130, ${ast.brightness})`;
+                ctx.fill();
+            }
+        }
+    }
+    
+    // ==================== UTILIDADES ====================
+    function lighten(hex, amount) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.min(255, (num >> 16) + amount);
+        const g = Math.min(255, ((num >> 8) & 0x00FF) + amount);
+        const b = Math.min(255, (num & 0x0000FF) + amount);
+        return `rgb(${r},${g},${b})`;
+    }
+    
+    function darken(hex, amount) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.max(0, (num >> 16) - amount);
+        const g = Math.max(0, ((num >> 8) & 0x00FF) - amount);
+        const b = Math.max(0, (num & 0x0000FF) - amount);
+        return `rgb(${r},${g},${b})`;
+    }
+    
+    // ==================== BUCLE PRINCIPAL ====================
+    function animate() {
+        ctx.clearRect(0, 0, W, H);
+        
+        // Fondo
+        const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) / 2);
+        bg.addColorStop(0, '#0a0a2a');
+        bg.addColorStop(1, '#000008');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+        
+        drawStars();
+        
+        const cx = W / 2 + camX * zoom;
+        const cy = H / 2 + camY * zoom;
+        
+        // Cinturón de asteroides
+        if (showAsteroids) {
+            drawAsteroidBelt(cx, cy);
+        }
+        
+        // Sol (siempre detrás)
+        drawSun(cx, cy);
+        
+        // Planetas enanos (detrás de planetas)
+        for (const dp of DATA.dwarfPlanets) {
+            drawDwarfPlanet(dp, cx, cy);
+        }
+        
+        // Planetas
+        const planetPositions = [];
+        for (const planet of DATA.planets) {
+            const pos = drawPlanet(planet, cx, cy);
+            planetPositions.push({ planet, ...pos });
+        }
+        
+        // Lunas (encima de sus planetas)
+        for (const moon of DATA.moons) {
+            const parentPos = planetPositions.find(p => p.planet.name === moon.parent);
+            if (parentPos) {
+                drawMoon(moon, parentPos.x, parentPos.y);
+            }
+        }
+        
+        // Actualizar tiempo
+        if (!isPaused) {
+            time += speed;
+        }
+        
+        requestAnimationFrame(animate);
+    }
+    
+    // ==================== INICIAR ====================
+    window.addEventListener('load', init);
+    </script>
+</body>
+</html>
