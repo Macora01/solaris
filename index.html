@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>🚁 Sistema Solar - Vista Cenital</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
@@ -13,6 +13,7 @@
             color: #fff;
             overflow: hidden;
             height: 100vh;
+            touch-action: none; /* Prevenir scroll en móvil */
         }
         
         #canvas-container {
@@ -24,6 +25,7 @@
         canvas {
             display: block;
             cursor: crosshair;
+            touch-action: none;
         }
         
         /* Panel de información */
@@ -177,7 +179,7 @@
             color: #bbb;
         }
         
-        /* Controles principales */
+        /* Controles principales - CON TRANSICIÓN */
         .main-controls {
             position: absolute;
             bottom: 20px;
@@ -192,6 +194,14 @@
             z-index: 100;
             flex-wrap: wrap;
             justify-content: center;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .main-controls.hidden {
+            opacity: 0;
+            transform: translate(-50%, 20px);
+            pointer-events: none;
+            user-select: none;
         }
         
         .ctrl-btn {
@@ -347,6 +357,67 @@
             font-size: 0.85em;
             z-index: 100;
         }
+        
+        /* === CONTROLES ADAPTATIVOS PARA MÓVIL === */
+        .controls-hint {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(74, 144, 226, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            z-index: 90;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+        
+        .controls-hint.visible {
+            opacity: 1;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.05); }
+        }
+        
+        /* En desktop siempre visibles */
+        @media (min-width: 769px) {
+            .controls-hint { display: none !important; }
+            .main-controls.hidden { 
+                opacity: 1 !important; 
+                transform: translateX(-50%) !important; 
+                pointer-events: auto !important; 
+            }
+        }
+        
+        /* Ajustes para pantallas muy pequeñas */
+        @media (max-width: 400px) {
+            .main-controls {
+                padding: 8px 10px;
+                gap: 4px;
+            }
+            .ctrl-btn {
+                padding: 6px 10px;
+                font-size: 0.75em;
+            }
+            #speed-display {
+                font-size: 0.8em;
+                min-width: 40px;
+            }
+            .nav-panel {
+                max-width: 200px;
+                padding: 10px;
+            }
+            .planet-item {
+                font-size: 0.8em;
+                padding: 4px 8px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -396,6 +467,9 @@
             <button class="ctrl-btn" id="btn-perspective" onclick="togglePerspective()">🌐 3D</button>
         </div>
         
+        <!-- Indicador para móviles -->
+        <div class="controls-hint" id="controls-hint">👆 Toca para mostrar controles</div>
+        
         <!-- Tooltip -->
         <div class="tooltip" id="tooltip"></div>
     </div>
@@ -435,7 +509,7 @@
                 radius: 6,
                 color: "#B5B5B5",
                 orbitRadius: 80,
-                speed: 4.15, // Velocidad relativa (más rápido = más cerca)
+                speed: 4.15,
                 info: {
                     "Tipo": "Planeta rocoso terrestre",
                     "Diámetro": "4.879 km",
@@ -847,7 +921,7 @@
                 radius: 3,
                 color: "#B8D4E3",
                 orbitRadius: 35,
-                speed: -3.0, // Retrograde
+                speed: -3.0,
                 info: {
                     "Tipo": "Satélite de Neptuno",
                     "Diámetro": "2.707 km",
@@ -918,7 +992,7 @@
     let hoveredBody = null;
     let selectedBody = null;
     
-    // Asteroides (generados una vez)
+    // Asteroides
     let asteroids = [];
     
     // ==================== INICIALIZACIÓN ====================
@@ -927,6 +1001,7 @@
         generateAsteroids();
         buildPlanetList();
         setupEvents();
+        initMobileControls(); // ← Inicializar controles móviles
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('btn-orbits').classList.add('active');
@@ -945,7 +1020,7 @@
         asteroids = [];
         for (let i = 0; i < 200; i++) {
             const angle = Math.random() * Math.PI * 2;
-            const radius = 270 + Math.random() * 60; // Entre Marte y Júpiter
+            const radius = 270 + Math.random() * 60;
             asteroids.push({
                 angle: angle,
                 radius: radius,
@@ -959,17 +1034,9 @@
     function buildPlanetList() {
         const list = document.getElementById('planet-list');
         list.innerHTML = '';
-        
-        // Sol
         addItem(list, DATA.sun, 'sun');
-        
-        // Planetas
         DATA.planets.forEach(p => addItem(list, p, 'planet'));
-        
-        // Planetas enanos
         DATA.dwarfPlanets.forEach(p => addItem(list, p, 'dwarf'));
-        
-        // Lunas principales
         DATA.moons.slice(0, 5).forEach(m => addItem(list, m, 'moon'));
     }
     
@@ -978,7 +1045,7 @@
         div.className = 'planet-item';
         div.dataset.name = body.name;
         div.innerHTML = `<div class="planet-dot" style="background:${body.color}"></div><span>${body.emoji} ${body.name}</span>`;
-        div.onclick = () => selectBody(body, type);
+        div.onclick = (e) => { e.stopPropagation(); selectBody(body, type); };
         container.appendChild(div);
     }
     
@@ -992,18 +1059,76 @@
         canvas.addEventListener('wheel', onWheel, { passive: false });
         canvas.addEventListener('click', onClick);
         
+        // Eventos táctiles para móvil
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onTouchEnd);
+        
         window.addEventListener('keydown', e => {
             if (e.code === 'Space') { e.preventDefault(); togglePause(); }
         });
     }
     
-    // ==================== INTERACCIÓN ====================
+    // ==================== INTERACCIÓN TÁCTIL ====================
+    let touchStartX, touchStartY;
+    let touchStartTime;
+    
+    function onTouchStart(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchStartTime = Date.now();
+        
+        isDragging = true;
+        dragStartX = touch.clientX;
+        dragStartY = touch.clientY;
+        dragCamStartX = camX;
+        dragCamStartY = camY;
+        
+        // Mostrar controles al tocar
+        showControls();
+    }
+    
+    function onTouchMove(e) {
+        e.preventDefault();
+        if (!isDragging) return;
+        
+        const touch = e.touches[0];
+        const dx = touch.clientX - dragStartX;
+        const dy = touch.clientY - dragStartY;
+        
+        // Si es movimiento pequeño y rápido, es un tap
+        if (Math.hypot(dx, dy) < 10 && Date.now() - touchStartTime < 200) {
+            return; // Dejar que onClick lo maneje
+        }
+        
+        // Si es arrastre, mover cámara
+        camX = dragCamStartX + dx / zoom;
+        camY = dragCamStartY + dy / zoom;
+        
+        // Detectar hover en móvil (opcional)
+        hoveredBody = detectHover(touch.clientX, touch.clientY);
+        showTooltip(touch.clientX, touch.clientY);
+    }
+    
+    function onTouchEnd(e) {
+        isDragging = false;
+        // Si fue un tap corto, simular click
+        if (Date.now() - touchStartTime < 200) {
+            const touch = e.changedTouches[0];
+            onClick({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => {} });
+        }
+    }
+    
+    // ==================== INTERACCIÓN MOUSE ====================
     function onMouseDown(e) {
         isDragging = true;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
         dragCamStartX = camX;
         dragCamStartY = camY;
+        showControls(); // Mostrar al interactuar
     }
     
     function onMouseMove(e) {
@@ -1012,11 +1137,8 @@
             camY = dragCamStartY + (e.clientY - dragStartY) / zoom;
         }
         
-        // Detectar hover
         hoveredBody = detectHover(e.clientX, e.clientY);
         canvas.style.cursor = hoveredBody ? 'pointer' : (isDragging ? 'grabbing' : 'grab');
-        
-        // Tooltip
         showTooltip(e.clientX, e.clientY);
     }
     
@@ -1028,6 +1150,7 @@
         e.preventDefault();
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
         zoom = Math.max(0.2, Math.min(5, zoom * factor));
+        showControls(); // Mostrar al hacer zoom
     }
     
     function onClick(e) {
@@ -1040,13 +1163,11 @@
         const cx = W / 2 + camX * zoom;
         const cy = H / 2 + camY * zoom;
         
-        // Verificar Sol
         const sunDist = Math.hypot(mx - cx, my - cy);
         if (sunDist < DATA.sun.radius * zoom + 10) {
             return { body: DATA.sun, type: 'sun' };
         }
         
-        // Verificar planetas
         for (const planet of DATA.planets) {
             const angle = time * planet.speed * 0.001;
             const px = cx + Math.cos(angle) * planet.orbitRadius * zoom;
@@ -1057,7 +1178,6 @@
             }
         }
         
-        // Verificar planetas enanos
         for (const dp of DATA.dwarfPlanets) {
             const angle = time * dp.speed * 0.001;
             const px = cx + Math.cos(angle) * dp.orbitRadius * zoom;
@@ -1068,7 +1188,6 @@
             }
         }
         
-        // Verificar lunas
         for (const moon of DATA.moons) {
             const parent = DATA.planets.find(p => p.name === moon.parent);
             if (!parent) continue;
@@ -1106,16 +1225,19 @@
         selectedBody = { body, type };
         showInfoPanel(body, type);
         
-        // Actualizar lista
         document.querySelectorAll('.planet-item').forEach(el => {
             el.classList.toggle('active', el.dataset.name === body.name);
         });
+        
+        // Mantener controles visibles cuando hay panel abierto
+        showControls();
     }
     
     function closePanel() {
         selectedBody = null;
         document.getElementById('info-panel').classList.add('hidden');
         document.querySelectorAll('.planet-item').forEach(el => el.classList.remove('active'));
+        resetHideTimer(); // Reiniciar timer al cerrar panel
     }
     
     function showInfoPanel(body, type) {
@@ -1125,12 +1247,10 @@
         
         let html = '';
         
-        // Información
         for (const [key, value] of Object.entries(body.info)) {
             html += `<div class="info-row"><span class="info-label">${key}</span><span class="info-value">${value}</span></div>`;
         }
         
-        // Composición
         if (body.composition) {
             html += '<div class="composition"><h4>🧪 Composición</h4>';
             for (const comp of body.composition) {
@@ -1145,12 +1265,10 @@
             html += '</div>';
         }
         
-        // Estructura interna
         if (body.structure) {
             html += `<div class="internal-structure"><h4>🌋 Estructura interna</h4><p>${body.structure}</p></div>`;
         }
         
-        // Tipo
         if (type === 'moon') {
             html += `<div class="info-row"><span class="info-label">Planeta padre</span><span class="info-value">${body.parent}</span></div>`;
         }
@@ -1167,42 +1285,122 @@
         isPaused = !isPaused;
         document.getElementById('btn-play').textContent = isPaused ? '▶️ Reanudar' : '⏸️ Pausar';
         document.getElementById('btn-play').classList.toggle('active', isPaused);
+        showControls();
     }
     
     function changeSpeed(delta) {
         speed = Math.max(0.1, Math.min(5, speed + delta));
         document.getElementById('speed-display').textContent = speed.toFixed(1) + 'x';
+        showControls();
     }
     
     function resetView() {
         camX = 0; camY = 0; zoom = 1;
         closePanel();
+        showControls();
     }
     
     function toggleOrbits() {
         showOrbits = !showOrbits;
         document.getElementById('btn-orbits').classList.toggle('active', showOrbits);
+        showControls();
     }
     
     function toggleLabels() {
         showLabels = !showLabels;
         document.getElementById('btn-labels').classList.toggle('active', showLabels);
+        showControls();
     }
     
     function toggleAsteroids() {
         showAsteroids = !showAsteroids;
         document.getElementById('btn-asteroids').classList.toggle('active', showAsteroids);
+        showControls();
     }
     
     function togglePerspective() {
         use3D = !use3D;
         document.getElementById('btn-perspective').classList.toggle('active', use3D);
         document.getElementById('view-indicator').textContent = use3D ? '🌐 Vista 3D Perspectiva' : '🚁 Vista Cenital - Helicóptero Interestelar';
+        showControls();
     }
     
+    // ==================== CONTROLES ADAPTATIVOS MÓVIL ====================
+    const isMobile = () => window.innerWidth <= 768;
+    const controls = document.querySelector('.main-controls');
+    const hint = document.getElementById('controls-hint');
+    let hideTimer = null;
+    let lastInteraction = Date.now();
+
+    function showControls() {
+        if (!controls) return;
+        controls.classList.remove('hidden');
+        if (isMobile()) {
+            hint.classList.add('visible');
+            setTimeout(() => hint.classList.remove('visible'), 3000);
+        }
+        resetHideTimer();
+    }
+
+    function hideControls() {
+        if (!isMobile() || !controls) return;
+        // No ocultar si hay panel de información abierto
+        const panel = document.getElementById('info-panel');
+        if (panel && !panel.classList.contains('hidden')) return;
+        controls.classList.add('hidden');
+    }
+
+    function resetHideTimer() {
+        if (!isMobile()) return;
+        lastInteraction = Date.now();
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            if (Date.now() - lastInteraction >= 5000) {
+                hideControls();
+            }
+        }, 5000);
+    }
+
+    function onInteraction(e) {
+        // Ignorar si es interacción con elementos del panel o botones
+        if (e.target.closest('input, button, .panel-body, .planet-item, .close-btn')) return;
+        showControls();
+    }
+
+    function initMobileControls() {
+        if (!isMobile()) return;
+        
+        // Mostrar controles al inicio
+        showControls();
+        
+        // Eventos para detectar interacción
+        const events = ['touchstart', 'touchmove', 'click', 'mousemove', 'wheel'];
+        events.forEach(evt => {
+            document.addEventListener(evt, onInteraction, { passive: true });
+        });
+        
+        // Revisar periódicamente si hay panel abierto
+        setInterval(() => {
+            const panel = document.getElementById('info-panel');
+            if (panel && !panel.classList.contains('hidden')) {
+                showControls();
+            }
+        }, 1000);
+        
+        // Ajustar al cambiar orientación o tamaño
+        window.addEventListener('resize', () => {
+            if (isMobile()) {
+                showControls();
+                resetHideTimer();
+            } else {
+                controls?.classList.remove('hidden');
+                if (hideTimer) clearTimeout(hideTimer);
+            }
+        });
+    }
+
     // ==================== RENDERIZADO ====================
     function drawStars() {
-        // Fondo estrellado estático
         const seed = 12345;
         let rng = seed;
         function rand() { rng = (rng * 16807) % 2147483647; return (rng - 1) / 2147483646; }
@@ -1231,7 +1429,6 @@
         const sun = DATA.sun;
         const r = sun.radius * zoom;
         
-        // Brillo exterior
         const glow = ctx.createRadialGradient(cx, cy, r, cx, cy, r * 4);
         glow.addColorStop(0, 'rgba(253, 184, 19, 0.3)');
         glow.addColorStop(0.5, 'rgba(255, 165, 0, 0.1)');
@@ -1241,7 +1438,6 @@
         ctx.fillStyle = glow;
         ctx.fill();
         
-        // Sol
         const grad = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, 0, cx, cy, r);
         grad.addColorStop(0, '#FFF5E1');
         grad.addColorStop(0.5, sun.color);
@@ -1251,8 +1447,10 @@
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
         
-        // Etiqueta
         if (showLabels) {
             ctx.fillStyle = '#fff';
             ctx.font = `bold ${Math.max(10, 12 * zoom)}px Segoe UI`;
@@ -1267,12 +1465,10 @@
         const y = cy + Math.sin(angle) * planet.orbitRadius * zoom;
         const r = planet.radius * zoom;
         
-        // Órbita
         if (showOrbits) {
             drawOrbit(cx, cy, planet.orbitRadius);
         }
         
-        // Selección/hover
         const isSelected = selectedBody?.body.name === planet.name;
         const isHovered = hoveredBody?.body.name === planet.name;
         
@@ -1286,7 +1482,6 @@
             ctx.setLineDash([]);
         }
         
-        // Planeta
         const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
         grad.addColorStop(0, lighten(planet.color, 40));
         grad.addColorStop(0.7, planet.color);
@@ -1300,7 +1495,6 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // Anillos de Saturno
         if (planet.hasRings) {
             ctx.save();
             ctx.translate(x, y);
@@ -1318,7 +1512,6 @@
             ctx.restore();
         }
         
-        // Etiqueta
         if (showLabels || isSelected || isHovered) {
             ctx.fillStyle = '#fff';
             ctx.font = `${Math.max(9, 11 * zoom)}px Segoe UI`;
@@ -1380,7 +1573,6 @@
         const y = parentY + Math.sin(angle) * moon.orbitRadius * zoom;
         const r = Math.max(2, moon.radius * zoom);
         
-        // Órbita lunar
         if (showOrbits && zoom > 0.5) {
             ctx.beginPath();
             ctx.arc(parentX, parentY, moon.orbitRadius * zoom, 0, Math.PI * 2);
@@ -1434,7 +1626,6 @@
         }
     }
     
-    // ==================== UTILIDADES ====================
     function lighten(hex, amount) {
         const num = parseInt(hex.replace('#', ''), 16);
         const r = Math.min(255, (num >> 16) + amount);
@@ -1451,11 +1642,9 @@
         return `rgb(${r},${g},${b})`;
     }
     
-    // ==================== BUCLE PRINCIPAL ====================
     function animate() {
         ctx.clearRect(0, 0, W, H);
         
-        // Fondo
         const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) / 2);
         bg.addColorStop(0, '#0a0a2a');
         bg.addColorStop(1, '#000008');
@@ -1467,27 +1656,22 @@
         const cx = W / 2 + camX * zoom;
         const cy = H / 2 + camY * zoom;
         
-        // Cinturón de asteroides
         if (showAsteroids) {
             drawAsteroidBelt(cx, cy);
         }
         
-        // Sol (siempre detrás)
         drawSun(cx, cy);
         
-        // Planetas enanos (detrás de planetas)
         for (const dp of DATA.dwarfPlanets) {
             drawDwarfPlanet(dp, cx, cy);
         }
         
-        // Planetas
         const planetPositions = [];
         for (const planet of DATA.planets) {
             const pos = drawPlanet(planet, cx, cy);
             planetPositions.push({ planet, ...pos });
         }
         
-        // Lunas (encima de sus planetas)
         for (const moon of DATA.moons) {
             const parentPos = planetPositions.find(p => p.planet.name === moon.parent);
             if (parentPos) {
@@ -1495,7 +1679,6 @@
             }
         }
         
-        // Actualizar tiempo
         if (!isPaused) {
             time += speed;
         }
@@ -1504,7 +1687,11 @@
     }
     
     // ==================== INICIAR ====================
-    window.addEventListener('load', init);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
     </script>
 </body>
 </html>
